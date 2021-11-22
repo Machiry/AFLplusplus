@@ -659,9 +659,13 @@ int main(int argc, char **argv_orig, char **envp) {
 
       case 'f':                                              /* target file */
 
-        if (afl->fsrv.out_file) { FATAL("Multiple -f options not supported"); }
-        afl->fsrv.out_file = ck_strdup(optarg);
-        afl->fsrv.use_stdin = 0;
+        if (afl->fsrv.out_file) { 
+          afl->fsrv.out_file2 = ck_strdup(optarg);
+          // FATAL("Multiple -f options not supported"); 
+        } else {
+          afl->fsrv.out_file = ck_strdup(optarg);
+          afl->fsrv.use_stdin = 0;
+        }
         break;
 
       case 'x':                                               /* dictionary */
@@ -2294,15 +2298,22 @@ stop_fuzzing:
   afl_fsrv_deinit(&afl->fsrv);
 
   /* remove tmpfile */
-  if (afl->tmp_dir != NULL && !afl->in_place_resume && afl->fsrv.out_file) {
+  if (afl->tmp_dir != NULL && !afl->in_place_resume) {
 
-    (void)unlink(afl->fsrv.out_file);
+    if (afl->fsrv.out_file) {
+      (void)unlink(afl->fsrv.out_file);
+    }
+    if (afl->fsrv.out_file2) {
+      (void)unlink(afl->fsrv.out_file2);
+    }
+
 
   }
 
   if (afl->orig_cmdline) { ck_free(afl->orig_cmdline); }
   ck_free(afl->fsrv.target_path);
   ck_free(afl->fsrv.out_file);
+  ck_free(afl->fsrv.out_file2);
   ck_free(afl->sync_id);
   if (afl->q_testcase_cache) { ck_free(afl->q_testcase_cache); }
   afl_state_deinit(afl);

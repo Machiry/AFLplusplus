@@ -138,6 +138,7 @@ static void write_with_gap(afl_state_t *afl, u8 *mem, u32 len, u32 skip_at,
                            u32 skip_len) {
 
   s32 fd = afl->fsrv.out_fd;
+  s32 fd2 = -1;
   u32 tail_len = len - skip_at - skip_len;
 
   /*
@@ -248,6 +249,12 @@ static void write_with_gap(afl_state_t *afl, u8 *mem, u32 len, u32 skip_at,
       unlink(afl->fsrv.out_file);                         /* Ignore errors. */
       fd = open(afl->fsrv.out_file, O_WRONLY | O_CREAT | O_EXCL,
                 DEFAULT_PERMISSION);
+      
+      if (afl->fsrv.out_file2) {
+          unlink(afl->fsrv.out_file2);
+          fd2 = open(afl->fsrv.out_file2, O_WRONLY | O_CREAT | O_EXCL,
+                  DEFAULT_PERMISSION);
+      }
 
     }
 
@@ -265,9 +272,23 @@ static void write_with_gap(afl_state_t *afl, u8 *mem, u32 len, u32 skip_at,
 
   } else {
 
-    ck_write(fd, mem, skip_at, afl->fsrv.out_file);
+    if (fd2 > 0 ){
+      u8 *new_buff = (u8*)malloc(skip_at + tail_len);
+      if (unlikely(!new_buff)) { PFATAL("alloc"); }
+      memcpy(new_buff, mem, skip_at);
+      memcpy(new_buff + skip_at, mem + skip_at + skip_len, tail_len);
 
-    ck_write(fd, mem + skip_at + skip_len, tail_len, afl->fsrv.out_file);
+      size_t len1 = (skip_at + tail_len)/2;
+      size_t len2 = (skip_at + tail_len) - len1;
+      ck_write(fd, new_buff, len1, afl->fsrv.out_file);
+      ck_write(fd2, new_buff+len1, len2, afl->fsrv.out_file2);
+      free(new_buff);
+
+    } else {
+      ck_write(fd, mem, skip_at, afl->fsrv.out_file);
+
+      ck_write(fd, mem + skip_at + skip_len, tail_len, afl->fsrv.out_file);
+    }
 
   }
 
@@ -279,6 +300,9 @@ static void write_with_gap(afl_state_t *afl, u8 *mem, u32 len, u32 skip_at,
   } else {
 
     close(fd);
+    if (fd2 > 0) {
+      close(fd2);
+    }
 
   }
 

@@ -62,6 +62,7 @@ typedef struct afl_forkserver {
 
   u8 *out_file,                         /* File to fuzz, if any             */
       *target_path;                     /* Path of the target               */
+  u8 *out_file2;
 
   FILE *plot_file;                      /* Gnuplot output file              */
 

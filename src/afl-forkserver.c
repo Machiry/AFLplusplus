@@ -85,6 +85,7 @@ void afl_fsrv_init(afl_forkserver_t *fsrv) {
   fsrv->init_tmout = EXEC_TIMEOUT * FORK_WAIT_MULT;
   fsrv->mem_limit = MEM_LIMIT;
   fsrv->out_file = NULL;
+  fsrv->out_file2 = NULL;
   fsrv->kill_signal = SIGKILL;
 
   /* exec related stuff */
@@ -114,6 +115,7 @@ void afl_fsrv_init_dup(afl_forkserver_t *fsrv_to, afl_forkserver_t *from) {
   fsrv_to->real_map_size = from->real_map_size;
   fsrv_to->support_shmem_fuzz = from->support_shmem_fuzz;
   fsrv_to->out_file = from->out_file;
+  fsrv_to->out_file2 = from->out_file2;
   fsrv_to->dev_urandom_fd = from->dev_urandom_fd;
   fsrv_to->out_fd = from->out_fd;  // not sure this is a good idea
   fsrv_to->no_unlink = from->no_unlink;
@@ -1119,6 +1121,7 @@ void afl_fsrv_write_to_testcase(afl_forkserver_t *fsrv, u8 *buf, size_t len) {
   } else {
 
     s32 fd = fsrv->out_fd;
+    s32 fd2 = -1;
 
     if (!fsrv->use_stdin && fsrv->out_file) {
 
@@ -1132,6 +1135,12 @@ void afl_fsrv_write_to_testcase(afl_forkserver_t *fsrv, u8 *buf, size_t len) {
         unlink(fsrv->out_file);                           /* Ignore errors. */
         fd = open(fsrv->out_file, O_WRONLY | O_CREAT | O_EXCL,
                   DEFAULT_PERMISSION);
+
+        if (fsrv->out_file2) {
+          unlink(fsrv->out_file2);
+          fd2 = open(fsrv->out_file2, O_WRONLY | O_CREAT | O_EXCL,
+                  DEFAULT_PERMISSION);
+        }
 
       }
 
@@ -1151,8 +1160,15 @@ void afl_fsrv_write_to_testcase(afl_forkserver_t *fsrv, u8 *buf, size_t len) {
 
     }
 
-    // fprintf(stderr, "WRITE %d %u\n", fd, len);
-    ck_write(fd, buf, len, fsrv->out_file);
+    if (fd2 > 0) {
+      size_t len1 = len/2;
+      size_t len2 = len - len1;
+      ck_write(fd, buf, len1, fsrv->out_file);
+      ck_write(fd2, buf+len1, len2, fsrv->out_file2);
+    } else {
+      // fprintf(stderr, "WRITE %d %u\n", fd, len);
+      ck_write(fd, buf, len, fsrv->out_file);
+    }
 
     if (fsrv->use_stdin) {
 
@@ -1162,6 +1178,10 @@ void afl_fsrv_write_to_testcase(afl_forkserver_t *fsrv, u8 *buf, size_t len) {
     } else {
 
       close(fd);
+
+      if (fd2 > 0) {
+        close(fd2);
+      }
 
     }
 
