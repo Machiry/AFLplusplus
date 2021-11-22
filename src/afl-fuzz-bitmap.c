@@ -458,6 +458,7 @@ save_if_interesting(afl_state_t *afl, void *mem, u32 len, u8 fault) {
   u64 cksum = 0;
 
   u8 fn[PATH_MAX];
+  u8 fn2[PATH_MAX];
 
   /* Update path frequency. */
 
@@ -776,7 +777,20 @@ save_if_interesting(afl_state_t *afl, void *mem, u32 len, u8 fault) {
 
   fd = open(fn, O_WRONLY | O_CREAT | O_EXCL, DEFAULT_PERMISSION);
   if (unlikely(fd < 0)) { PFATAL("Unable to create '%s'", fn); }
-  ck_write(fd, mem, len, fn);
+
+  if (afl->fsrv.out_file2) {
+    s32 fd2;
+    u32 len1 = len/2;
+    u32 len2 = len - len1;
+    snprintf(fn2, PATH_MAX, "%s_2", fn);
+    fd2 = open(fn2, O_WRONLY | O_CREAT | O_EXCL, DEFAULT_PERMISSION);
+    if (unlikely(fd2 < 0)) { PFATAL("Unable to create '%s'", fn2); }
+    ck_write(fd, mem, len1, fn);
+    ck_write(fd2, ((char*)mem)+len1, len2, fn2);
+    close(fd2);
+  } else {
+    ck_write(fd, mem, len, fn);
+  }
   close(fd);
 
   return keeping;
